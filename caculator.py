@@ -6,15 +6,15 @@ class GUI(tk.Frame):
         self.master = master
         self.equation = ""
         self.solution = ""
-        self.equation_text_box = tk.Label(master=self, text=self.equation)
-        self.equation_text_box.pack(side = "top")
-        self.solution_text_box = tk.Label(master=self, text=self.solution)
-        self.solution_text_box.pack(side = "top")
         self.pack()
         self.create_widgets()
     ############################################# CREATE ALL GUI #############################################################
     def create_widgets(self):
-        
+        # Creates the equation and solution text box #
+        self.equation_text_box = tk.Label(master=self, text=self.equation)
+        self.equation_text_box.pack(side = "top")
+        self.solution_text_box = tk.Label(master=self, text=self.solution)
+        self.solution_text_box.pack(side = "top")
         # PRIMARY PAD FOR ALL BUTTONS #
         pad = tk.Frame(master=self,width = 300,height = 300)
         pad.pack(side = "bottom")
@@ -66,6 +66,10 @@ class GUI(tk.Frame):
         self.exponent_sign.grid(row=1,column=1)
         self.decimal_sign = tk.Button(master=signs_pad,text=".",fg="black",width=4,height=3,command=self.decimal)
         self.decimal_sign.grid(row=1,column=2)
+        self.leftparen_sign = tk.Button(master=signs_pad,text="(",fg="black",width=4,height=3,command=self.leftparen)
+        self.leftparen_sign.grid(row=2,column=0)
+        self.rightparen_sign = tk.Button(master=signs_pad,text=")",fg="black",width=4,height=3,command=self.rightparen)
+        self.rightparen_sign.grid(row=2,column=1)
         #####################################################################################################################
         ##################### SECONDARY PAD FOR ALL CONFIGURING BUTTONS (ENTER,EXIT,DELETE) #####################################################
         configure_pad = tk.Frame(master=pad,width=150,height=150)
@@ -113,28 +117,41 @@ class GUI(tk.Frame):
     def np10(self): 
         self.equation+='0'
         self.update_command_line()
-    def add(self): 
-        self.equation+='+'
+    def add(self):
+        # if placed when equation box is empty and solution box is not empty (meaning a problem already has been solved)... re add the solution to the equation. 
+        if self.problem_already_answered: self.equation+=self.solution+'+'
+        else: self.equation+='+'
         self.update_command_line()
     def subtract(self): 
-        self.equation+='-'
+        if self.problem_already_answered(): self.equation+=self.solution+'-'
+        else: self.equation+='-'
         self.update_command_line()
     def multiply(self): 
-        self.equation+='*'
+        if self.problem_already_answered(): self.equation+=self.solution+'*'
+        else: self.equation+='*'
         self.update_command_line()
     def devide(self): 
-        self.equation+='/'
+        if self.problem_already_answered(): self.equation+=self.solution+'/'
+        else: self.equation+='/'
         self.update_command_line()
     def exponent(self):
-        self.equation+='^'
+        if self.problem_already_answered(): self.equation+=self.solution+'^'
+        else: self.equation+='^'
         self.update_command_line()
     def decimal(self):
         self.equation+="."
         self.update_command_line()
+    def leftparen(self):
+        self.equation+='('
+        self.update_command_line()
+    def rightparen(self):
+        self.equation+=')'
+        self.update_command_line()
     def enter(self):
-        print(self.equation)
         cac = Caculator(self.equation)
+        cac.solve_number_problem()
         self.solution= cac.return_solution()
+        self.equation = ""
         self.update_command_line()
     def delete(self):
         self.equation = self.equation[:-1]
@@ -143,124 +160,77 @@ class GUI(tk.Frame):
         self.equation = ""
         self.solution  = ""
         self.update_command_line()
-    ###################################### CREATE AND UPDATE BOTH PROBLEM AND SOLUTION LABEL BOXES ####################################
+    ###################################### UPDATE BOTH PROBLEM AND SOLUTION LABEL BOXES ####################################
     def update_command_line(self):
         self.equation_text_box["text"] = self.equation
         self.solution_text_box["text"] = self.solution
+    ###################################### CHECKS IF THE EQUATION TEXT IS EMPTY AND THE SOLUTION TEXT IS NOT EMPTY OR INF... IF SO RETURN TRUE ######################################
+    def problem_already_answered(self):
+        return self.equation == "" and self.solution != "" and self.solution != "inf" and self.solution != "-inf" 
 
 class Caculator:
     def __init__(self, problem_input,x=0,y=0):
+        print(problem_input)
         self.problem_input = problem_input.strip(" ")
-        self.x,self.y = x,y
-        self.pemdas = (('(',')'),('^','^'),('*','/'),('+','-'))
-        self.variables = ['x','y']
+        self.pemdas = {'(':4,')':4,'^':3,'*':2,'/':2,'+':1,'-':1}
         self.signs = ['+','*','-','/','^']
-        self.inequality_signs = ['<','>','<=','>=']
-        self.organized_problem = []
         self.solved_solution = 0
-        self.translate_problem()
-    def translate_problem(self):
-        for char in self.problem_input:
-            if char in self.variables[0]:
-                self.organized_problem.append(self.x)
-            elif char in self.variables[1]:
-                self.organized_problem.append(self.y)
 
-        return self._find_type_problem()
-    def _find_type_problem(self):
-        # Checking what type of problem it is.
-        for char in self.inequality_signs: 
-            if char in self.organized_problem: self._solve_inequality()
-        if '=' in self.organized_problem: self._solve_equation()
-        elif (self.x + self.y == 0):
-            self.organized_problem = self.problem_input 
-            self._solve_number_problem()
-        else: self._solve_expression()
-
-    def _solve_number_problem(self):
+    def solve_number_problem(self):
         c = 0
-        str_lst = [""]
+        problem_list = [""]
         # make string problem into list form
-        for char in self.organized_problem:
-            if char.isnumeric():
-                str_lst[c] += char
-            elif char in self.signs:
-                str_lst.append(char)
-                str_lst.append("")
+        for char in self.problem_input:
+            if char in self.signs:
+                problem_list.append(char)
+                problem_list.append("")
                 c+=2
+            else:
+                problem_list[c] += char
         # if first list element is a sign return nothing
-        if str_lst[0] in self.signs:
+        if problem_list[0] in self.signs:
             return
         # if not  a complete 3 part problem, exit | example - (['5'] ['+'] ['5']) is length 3 but (['5'], ['+']) is 2 
-        while len(str_lst) >= 2:
-            # get first sign in list
-            for loc,val in enumerate(str_lst):
-                if val in self.signs:
-                    sign = val
-                    break
-            # put the two numbers in the front in variables...
+        while len(problem_list) >= 2:
+            sign_value = 0
+            # PAMDAS ALGORITHN - Goes through all signs in list and gets the highest ranked sign according to PEMDAS, for example (* is higher ranked than +)
+            for l,v in enumerate(problem_list):
+                if v in self.signs:
+                    if (self.pemdas[v] > sign_value):
+                        sign_value = self.pemdas[v]
+                        sign = v
+                        loc = l
+            # get the two numbers beside the highest ranked sign according to PEMDAS...
             # converting it to a float to make it compatiable with float pointing numbers from division | '10' to 10.0
-            num1 = float(str_lst[0])
-            num2 = float(str_lst[2])
+            try:
+                num1 = float(problem_list[loc-1])
+                num2 = float(problem_list[loc+1])
+            # if number cannot be converted change it to inf if positive and -inf if negative instead
+            except:
+                for char in str(self.solved_solution):
+                    if char == "+":
+                        self.solved_solution = "inf"
+                        return
+                    elif char == "-":
+                        self.solved_solution = "-inf"
+                        return
             # do the operation
             if sign == '+': self.solved_solution = num1 + num2
             elif sign == '*': self.solved_solution = num1 * num2
             elif sign == '-': self.solved_solution = num1 - num2
             elif sign == "/": self.solved_solution = num1 / num2
-            elif sign == '^': self.solve_solution = math.pow(num1,num2)
-            # remove first two numbers and insert the solved solution at the beginning of the list
-            # remove both numbers and sign - the 3 in front
-            for _ in range(3): str_lst.pop(0)
-            # readd the self.solution to be added to future numbers
-            str_lst.insert(0, self.solved_solution)        
-
-            
-    def _solve_expression(self):
-        print("Solve expression")
-        first_var = self._order_first()
-        last_var = self._order_last()
-
-        for var in self.organized_problem:
-            if var == "+":
-                self.solved_solution += first_var + last_var
-            elif var == "*":
-                self.solved_solution += first_var * last_var
-            elif var == "-":
-                self.solved_solution += first_var - last_var
-            elif var == "^":
-                self.solved_solution += first_var ** last_var
-            elif var == "/":
-                if self.x == 0 or self.y == 0:
-                    print("Cant devide by zero!")
-                    break
-                self.solved_solution += first_var / last_var
-    def _solve_equation(self):
-        print("Solve equations")
-    def _solve_inequality(self):
-        print("Solve inequalities")
-    def _order_first(self):
-        for var in self.organized_problem:
-            if var == self.x:
-                return self.x
-            elif var == self.y:
-                return self.y
-        return self.x
-    def _order_last(self):
-        for var in self.organized_problem:
-            if var == self.x:
-                return self.y
-            elif var == self.y:
-                return self.x
-        return self.y
+            elif sign == '^': self.solved_solution = num1 ** num2
+            # get the two numbers beside the highest ranked sign according to PEMDAS and the highest ranking sign and remove them (['5','+','5'])...
+            for _ in range(3): problem_list.pop(loc-1)
+            # readd the solution to those 2 numbers and add it back
+            problem_list.insert(loc-1, self.solved_solution)
 
     def return_solution(self):
-        return f"= {self.solved_solution}"
-
+        return str(self.solved_solution)
 def main():
     root = tk.Tk()
     gui = GUI(master=root)
     gui.mainloop()
-
 
 if __name__ == '__main__':
     main()
